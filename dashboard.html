@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Продажи по дням</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--ink:#141b2d;--mut:#5f6a86;--bg:#eef2f9;--card:rgba(255,255,255,.66);--line:rgba(20,27,45,.09);--track:rgba(20,27,45,.07);--g1:rgba(79,91,213,.22);--g2:rgba(31,163,154,.20);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e8ecf7;--mut:#8f9bb8;--bg:#0f1524;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.09);--track:rgba(255,255,255,.09);--g1:rgba(79,91,213,.30);--g2:rgba(31,163,154,.22)}}
+:root[data-theme="dark"]{--ink:#e8ecf7;--mut:#8f9bb8;--bg:#0f1524;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.09);--track:rgba(255,255,255,.09);--g1:rgba(79,91,213,.30);--g2:rgba(31,163,154,.22)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 Onest,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(600px 420px at 12% 8%,var(--g1),transparent 70%),radial-gradient(640px 460px at 92% 0%,var(--g2),transparent 70%);background-size:140% 140%;animation:drift 26s ease-in-out infinite alternate}
+@keyframes drift{to{background-position:14% 10%}}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 20px 48px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em}
+.sub{margin:4px 0 0;color:var(--mut)}
+.tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mut)}
+.chip.live .dot{background:#1fa39a;animation:pulse 2s infinite}
+.chip.err{color:#d9534f}.chip.err .dot{background:#d9534f}
+@keyframes pulse{50%{box-shadow:0 0 0 5px rgba(31,163,154,.18)}}
+button{font:600 14px Onest,system-ui,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 16px;cursor:pointer;backdrop-filter:blur(10px);transition:background .2s,border-color .2s}
+button:hover{border-color:var(--mut)}
+button:focus-visible{outline:2px solid #4f5bd5;outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:26px 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;backdrop-filter:blur(10px)}
+.kpi small{display:block;color:var(--mut);font-size:13px}
+.kpi b{display:block;font-size:30px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.kpi span{font-size:13px;color:var(--mut)}
+.kpi.hero{background:linear-gradient(135deg,#3557d6,#1fa39a);border:0;color:#fff}
+.kpi.hero small,.kpi.hero span{color:rgba(255,255,255,.82)}
+.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}h1{font-size:26px}}
+h2{margin:0 0 4px;font-size:16px;font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-bottom:14px}
+.legend i,.prod i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.cols{display:flex;gap:12px}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center}
+.val{font-size:12px;color:var(--mut);margin-bottom:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.val.best{color:#1fa39a;font-weight:700}
+.plot{height:190px;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.stack{width:100%;max-width:64px;height:0;display:flex;flex-direction:column-reverse;border-radius:10px 10px 4px 4px;overflow:hidden;transition:height 1s cubic-bezier(.2,.8,.2,1)}
+.seg{flex-basis:0;flex-shrink:1}
+.dl{margin-top:8px;font-size:12px;color:var(--mut);white-space:nowrap}
+.prod{margin:16px 0 0}
+.prod .r{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:8px;background:var(--track);margin:7px 0 4px;overflow:hidden}
+.bar div{height:100%;width:0;border-radius:8px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.prod .m{font-size:13px;color:var(--mut)}
+.note{margin:14px 0 0;padding-left:16px;border-left:3px solid #1fa39a;max-width:70ch}
+.foot{margin-top:18px;font-size:12.5px;color:var(--mut);max-width:80ch}
+body.drag::after{content:"Отпустите файл .xlsx, чтобы обновить дашборд";position:fixed;inset:12px;z-index:9;display:grid;place-items:center;border:2px dashed #4f5bd5;border-radius:24px;background:var(--bg);opacity:.94;font-weight:600;font-size:18px}
+@media(prefers-reduced-motion:reduce){body::before,.chip.live .dot{animation:none}.stack,.bar div{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Продажи по дням</h1>
+      <p class="sub" id="period"></p>
+    </div>
+    <div class="tools">
+      <div class="chip" id="status"><i class="dot"></i><span></span></div>
+      <button id="connect" type="button">Подключить файл</button>
+      <input id="file" type="file" accept=".xlsx,.xlsm,.xls" hidden>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="card kpi hero"><small>Выручка за период</small><b id="k1">0</b><span id="s1"></span></div>
+    <div class="card kpi"><small>Продано товаров</small><b id="k2">0</b><span id="s2"></span></div>
+    <div class="card kpi"><small>Выручка в день</small><b id="k3">0</b><span>в среднем</span></div>
+    <div class="card kpi"><small>Лучший день</small><b id="k4">0</b><span id="s4"></span></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Выручка по дням</h2>
+      <div class="legend" id="legend"></div>
+      <div class="cols" id="cols"></div>
+    </div>
+    <div class="card">
+      <h2>Итоги по товарам</h2>
+      <div id="prods"></div>
+    </div>
+  </section>
+
+  <p class="note" id="note"></p>
+  <p class="foot">Берутся только вводимые данные листа «Продажи»: дата, товар, количество и цена. Суммы, итоги и графики считаются на странице заново при каждой загрузке файла.</p>
+</div>
+
+<script>
+const RUB=n=>Math.round(n).toLocaleString('ru-RU')+' ₽', NUM=n=>Math.round(n).toLocaleString('ru-RU');
+const WD=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const MO=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const COL=['#4f5bd5','#1fa39a','#e3a13a','#d9578a','#5aa9e6','#8a94a8'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D=iso=>new Date(iso+'T00:00:00Z');
+const pad=n=>String(n).padStart(2,'0');
+const dayLbl=iso=>{const d=D(iso);return WD[d.getUTCDay()]+' '+pad(d.getUTCDate())+'.'+pad(d.getUTCMonth()+1)};
+const plural=n=>{const a=n%10,b=n%100;return b>10&&b<15?'продаж':a==1?'продажа':a>1&&a<5?'продажи':'продаж'};
+
+// Текущие данные листа «Продажи»: [дата, товар, кол-во, цена]
+let rows=[["2026-09-21","Товар А",12,1500],["2026-09-21","Товар Б",8,2300],["2026-09-22","Товар В",20,700],["2026-09-22","Товар А",15,1500],["2026-09-23","Товар Б",5,2300],["2026-09-23","Товар В",18,700],["2026-09-24","Товар А",9,1500],["2026-09-24","Товар Б",11,2300],["2026-09-25","Товар В",25,700],["2026-09-25","Товар А",14,1500]];
+
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+function count(el,to,fmt){
+  const from=+el.dataset.v||0;el.dataset.v=to;const t0=performance.now(),dur=reduce?0:900;
+  const step=t=>{const k=dur?Math.min((t-t0)/dur,1):1,e=1-Math.pow(1-k,3);el.textContent=fmt(from+(to-from)*e);if(k<1)requestAnimationFrame(step)};
+  requestAnimationFrame(step);
+}
+function setStatus(text,mode){const c=$('#status');c.className='chip'+(mode?' '+mode:'');c.querySelector('span').textContent=text}
+
+function render(){
+  const days=[...new Set(rows.map(r=>r[0]))].sort(), prods=[...new Set(rows.map(r=>r[1]))], n=days.length;
+  const rev=r=>r[2]*r[3], sum=a=>a.reduce((s,x)=>s+x,0);
+  const total=sum(rows.map(rev)), qty=sum(rows.map(r=>r[2]));
+  const byDay=days.map(d=>{const parts=prods.map(p=>sum(rows.filter(r=>r[0]==d&&r[1]==p).map(rev)));return{d,parts,t:sum(parts)}});
+  const best=byDay.reduce((a,b)=>b.t>a.t?b:a), max=best.t||1;
+  const P=prods.map((name,i)=>({name,c:COL[i%COL.length],rev:sum(rows.filter(r=>r[1]==name).map(rev)),qty:sum(rows.filter(r=>r[1]==name).map(r=>r[2]))}));
+
+  const a=D(days[0]),b=D(days[n-1]),ya=a.getUTCFullYear(),yb=b.getUTCFullYear();
+  $('#period').textContent=n==1?`${a.getUTCDate()} ${MO[a.getUTCMonth()]} ${ya}`
+    :a.getUTCMonth()==b.getUTCMonth()&&ya==yb?`${a.getUTCDate()}–${b.getUTCDate()} ${MO[b.getUTCMonth()]} ${yb}`
+    :`${a.getUTCDate()} ${MO[a.getUTCMonth()]}${ya!=yb?' '+ya:''} – ${b.getUTCDate()} ${MO[b.getUTCMonth()]} ${yb}`;
+
+  count($('#k1'),total,RUB);count($('#k2'),qty,NUM);count($('#k3'),total/n,RUB);count($('#k4'),best.t,RUB);
+  $('#s1').textContent=`${rows.length} ${plural(rows.length)}`;
+  $('#s2').textContent=`${Math.round(qty/n)} шт. в день`;
+  $('#s4').textContent=dayLbl(best.d);
+
+  $('#legend').innerHTML=P.map(p=>`<span><i style="background:${p.c}"></i>${esc(p.name)}</span>`).join('');
+  $('#cols').innerHTML=byDay.map(x=>`<div class="col"><div class="val${x===best?' best':''}">${(x.t/1000).toLocaleString('ru-RU',{maximumFractionDigits:1})} тыс.</div><div class="plot"><div class="stack" data-h="${x.t/max*100}">${x.parts.map((v,i)=>v?`<div class="seg" style="flex-grow:${v};background:${COL[i%COL.length]}" title="${esc(prods[i])} · ${dayLbl(x.d)}: ${RUB(v)}"></div>`:'').join('')}</div></div><div class="dl">${dayLbl(x.d)}</div></div>`).join('');
+
+  const sorted=[...P].sort((x,y)=>y.rev-x.rev);
+  $('#prods').innerHTML=sorted.map(p=>{const s=total?p.rev/total:0;return `<div class="prod"><div class="r"><span><i style="background:${p.c}"></i>${esc(p.name)}</span><span>${RUB(p.rev)}</span></div><div class="bar"><div data-w="${s*100}" style="background:${p.c}"></div></div><div class="m">${NUM(p.qty)} шт. · ${Math.round(s*100)}% выручки</div></div>`}).join('');
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.stack').forEach(s=>s.style.height=s.dataset.h+'%');
+    document.querySelectorAll('.bar div').forEach(s=>s.style.width=s.dataset.w+'%');
+  }));
+
+  const T=sorted[0],Q=[...P].sort((x,y)=>y.qty-x.qty)[0],pc=p=>Math.round(total?p.rev/total*100:0)+'%';
+  $('#note').textContent=P.length<2?'':T===Q
+    ?`${T.name} лидирует и по выручке (${pc(T)}), и по количеству (${NUM(T.qty)} шт.).`
+    :`${T.name} даёт ${pc(T)} выручки при ${NUM(T.qty)} шт. ${Q.name} продаётся чаще всех (${NUM(Q.qty)} шт.), а приносит ${pc(Q)}.`;
+}
+
+function toIso(v){
+  if(typeof v==='number'&&v>20000)return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+  const m=typeof v==='string'&&v.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  return m?`${m[3]}-${pad(m[2])}-${pad(m[1])}`:null;
+}
+function load(buf,name,mode){
+  try{
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames.find(n=>/продаж/i.test(n))||wb.SheetNames[0]];
+    const out=[];
+    for(const r of XLSX.utils.sheet_to_json(ws,{header:1,raw:true})){
+      const d=toIso(r[0]);
+      if(d&&typeof r[1]==='string'&&r[1].trim()&&typeof r[2]==='number'&&typeof r[3]==='number')out.push([d,r[1].trim(),r[2],r[3]]);
+    }
+    if(!out.length)throw 0;
+    rows=out;render();
+    setStatus(`${mode=='live'?'Слежу за':'Загружен'} «${name}» · ${new Date().toLocaleTimeString('ru-RU')}`,mode=='live'?'live':'');
+  }catch(e){setStatus('Не удалось прочитать: нужен лист «Продажи» со столбцами Дата, Товар, Кол-во, Цена','err')}
+}
+const readFile=f=>f.arrayBuffer().then(b=>load(b,f.name));
+
+$('#file').addEventListener('change',e=>{const f=e.target.files[0];f&&readFile(f);e.target.value=''});
+addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drag')});
+addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('drag')});
+addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drag');const f=e.dataTransfer.files[0];f&&readFile(f)});
+
+// Автообновление: выбираем файл один раз, дальше страница сама перечитывает его после каждого сохранения
+let timer;
+$('#connect').addEventListener('click',async()=>{
+  try{
+    const [h]=await window.showOpenFilePicker({types:[{description:'Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
+    clearInterval(timer);let last=0;
+    const tick=async()=>{try{const f=await h.getFile();if(f.lastModified!==last){last=f.lastModified;load(await f.arrayBuffer(),f.name,'live')}}catch(e){}};
+    tick();timer=setInterval(tick,1500);
+  }catch(e){if(!e||e.name!=='AbortError')$('#file').click()}
+});
+
+setStatus('Показаны данные из dashboard_prodazhi.xlsx');
+render();
+</script>
+</body>
+</html>
